@@ -229,27 +229,6 @@ plt.savefig('Data_Within_10p.jpg', format = 'JPEG')
 #pool.map(splittingparam,cat)
 #pool.close()
                 
-                
-                
-                #if eveidx >1 and snr>5:
-                    #compf = comp1/goodcompf
-                    #compw = comp2/goodcompf
-                    #if compf < 0.1 and compw < 0.1:
-                        #gooddata.append(fast, delay)
-                        #plots(stW, stF)
-                    #else:
-                        #pass
-                #else:
-                    #pass
-                    
-                    #gooddata.append(fast, delay)
-                    #plots(stW, stF)
-                #print('Here is our direction: ' + str(fast) + ' here is our delay: ' + str(delay))
-                #print(arrival)
-                #print(fast)
-                #print(delay)
-                
-                
         ##trim data for S-N-R calculation
         
         ##Add the results to a file with magnitude, time of event, distance, backazimuth
