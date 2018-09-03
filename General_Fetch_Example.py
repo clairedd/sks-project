@@ -7,10 +7,10 @@ from obspy import UTCDateTime
 def main():
 
 	network='TA'
-	station='E25K' #None
-	starttime = "2016-08-23"
-	endtime = "2016-09-28"
-	centercoords = [58, -145]
+	station=None
+	starttime = "2008-08-01"
+	endtime = "2009-08-01"
+	centercoords = [39, -111]
 	minradius = 30
 	maxradius = 120
 	minmag = 6.0
@@ -19,7 +19,7 @@ def main():
 	#are within the boundary box given
 
 	test = Fetch(network=network,station=station,starttime=UTCDateTime(starttime),endtime=UTCDateTime(endtime),\
-		minlatitude=55,maxlatitude=70,minlongitude=-160,maxlongitude=-140)
+		minlatitude=38,maxlatitude=40,minlongitude=-110,maxlongitude=-112)
 
 	#Fetch the details of the events that are within the request region 
 	test.fetchEvents(centercoords=centercoords,minradius=minradius,maxradius=maxradius,minmag=minmag)
@@ -36,10 +36,10 @@ def main():
 	#Get the data and store in a file called waveforms_dir. You can give it any path
 	#Note that the data are downloaded as mseed files, one per component
 	print("Getting data")
-	test.GetData(req_type='event',datadirpath='waveforms_dir')
+	test.GetData(req_type='event',datadirpath='sheba_test')
 
 	#Remove instrument response. Default is to displacement
-	test.CorrectResponse()
+	#test.CorrectResponse()
 
 if __name__ == '__main__': 
 
