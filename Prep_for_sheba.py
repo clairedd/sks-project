@@ -16,7 +16,7 @@ from obspy.geodetics import locations2degrees
 #################################################################################
 
 def filter_traces(trace, basename,station_code,stlat,stlon,evlat,evlon,evdep,win_start,
-    win_end,cluster_1,cluster_2,filters = [(0.02,0.1),(0.05,0.15),(0.05,0.2),(0.05,0.3),(0.1,0.3)]):
+    win_end,cluster_1,cluster_2,filters=[(0.02,0.1),(0.05,0.15),(0.05,0.2),(0.05,0.3),(0.1,0.3)]):
 
     '''
     Select a trace, then loop over a range of bands and filter it. Then write to file. Each one of these
@@ -39,8 +39,14 @@ def filter_traces(trace, basename,station_code,stlat,stlon,evlat,evlon,evdep,win
         newname = stanet+'_'+comptime[1]+'.'+str(b1)+'.'+str(b2)+'.SAC.'+comptime[0]
 
         t.detrend('demean')
-        t.detend('simple')
+        t.detrend('simple')
         t.filter("bandpass",freqmin=b1,freqmax=b2)
+
+        #first write the file. It will then need to be re-opened as SAC
+        #this is bad practice because of the IO, but if the files are coming in in mseed
+        #format it may be the only option.
+
+        t.write(newname,format='SAC')
 
         write_sac(newname, station_code, stlat, stlon, evlat, evlon, evdep, win_start, win_end, cluster_1, cluster_2)
 
@@ -67,18 +73,19 @@ def write_sac(newname,station_code,stlat,stlon,evlat,evlon,evdep,win_start,win_e
     trace.stats.sac.user3 = win_end 
 
     #Set the azimuth and inc information of the components
-    if 'BHZ' in mseed_file:
+    if 'BHZ' in newname:
         trace.stats.sac.cmpaz = 0.0
         trace.stats.sac.cmpinc = 0.0
-    elif 'BHE' in mseed_file:
+    elif 'BHE' in newname:
         trace.stats.sac.cmpaz = 90
         trace.stats.sac.cmpinc = 90
-    elif 'BHN' in mseed_file:
+    elif 'BHN' in newname:
         trace.stats.sac.cmpaz = 0
         trace.stats.sac.cmpinc = 90
 
     print("Writing %s" %newname)
     trace.write(newname,format='SAC')
+
 
 #################################################################################
 # MAIN PROGRAM
@@ -165,78 +172,6 @@ def main():
 
     print("Moving SAC files to sheba project directory")
     os.system('mv *SAC* sheba_files')
-
-
-def filter_traces(trace, basename,station_code,stlat,stlon,evlat,evlon,evdep,win_start,
-    win_end,cluster_1,cluster_2,filters=[(0.02,0.1),(0.05,0.15),(0.05,0.2),(0.05,0.3),(0.1,0.3)]):
-
-    '''
-    Select a trace, then loop over a range of bands and filter it. Then write to file. Each one of these
-    filter files can then be investigated with SHEBA
-    '''
-
-    #construct the name of the new SAC file to write
-
-    t = trace.copy()
-
-    fnameparts = basename.split('..')
-    stanet = fnameparts[0]
-    comptime = fnameparts[1].split('__')
-
-    for band in filters:
-
-        b1 = band[0]
-        b2 = band[1]
-
-        newname = stanet+'_'+comptime[1]+'.'+str(b1)+'.'+str(b2)+'.SAC.'+comptime[0]
-
-        t.detrend('demean')
-        t.detrend('simple')
-        t.filter("bandpass",freqmin=b1,freqmax=b2)
-
-        #first write the file. It will then need to be re-opened as SAC
-        #this is bad practice because of the IO, but if the files are coming in in mseed
-        #format it may be the only option.
-
-        t.write(newname,format='SAC')
-
-        write_sac(newname, station_code, stlat, stlon, evlat, evlon, evdep, win_start, win_end, cluster_1, cluster_2)
-
-def write_sac(newname,station_code,stlat,stlon,evlat,evlon,evdep,win_start,win_end,cluster_1,cluster_2):
-
-    '''
-    Read a SAC file and write important components to its header
-    '''
-
-    trace = op.read(newname,format='SAC')
-    trace = trace[0]
-    #fill the sac header
-    trace.stats.sac.kstnm = station_code
-    trace.stats.sac.stla = stlat
-    trace.stats.sac.stlo = stlon
-    trace.stats.sac.evla = evlat
-    trace.stats.sac.evlo = evlon
-    trace.stats.sac.evdp = evdep
-
-    #set the start and end time of the analysis windows
-    trace.stats.sac.user0 = win_start
-    trace.stats.sac.user1 = cluster_1
-    trace.stats.sac.user2 = cluster_2
-    trace.stats.sac.user3 = win_end 
-
-    #Set the azimuth and inc information of the components
-    if 'BHZ' in newname:
-        trace.stats.sac.cmpaz = 0.0
-        trace.stats.sac.cmpinc = 0.0
-    elif 'BHE' in newname:
-        trace.stats.sac.cmpaz = 90
-        trace.stats.sac.cmpinc = 90
-    elif 'BHN' in newname:
-        trace.stats.sac.cmpaz = 0
-        trace.stats.sac.cmpinc = 90
-
-    print("Writing %s" %newname)
-    trace.write(newname,format='SAC')
 
 
 
