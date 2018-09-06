@@ -9,10 +9,10 @@ from obspy.geodetics.base import gps2dist_azimuth
 from obspy.core.event import Amplitude
 from multiprocessing import Pool
 
-mpl.rc('font',family='serif')
-mpl.rc('font',serif='Times') 
-mpl.rc('text', usetex=True)
-mpl.rc('font',size=12)
+#mpl.rc('font',family='serif')
+#mpl.rc('font',serif='Times') 
+#mpl.rc('text', usetex=True)
+#mpl.rc('font',size=12)
 
 from obspy.taup import TauPyModel
 model = TauPyModel(model="iasp91")
@@ -90,34 +90,37 @@ def plots(stW, stF):
 
 print("Getting Station Info")
 net = 'IU'
-stat= 'ULN'
+stat= 'ANMO'
 
-stime = UTCDateTime('2001-001T00:00:00.0')
+stime = UTCDateTime('2010-001T00:00:00.0')
 
 #stalat = 40.128
 #stalon= -107.51
 
 client = Client("IRIS")
-#inventory = client.get_stations(network=net, station=stat,
-                                    #channel = 'BH*', level="response",
-                                    #location="00",starttime=stime)
+inventory = client.get_stations(network=net, station=stat,
+                                    channel = 'BH*', level="response",
+                                    location="00",starttime=stime)
                                     
-#print("getting station coordinates")
-#station_coordinates = []
-#for network in inventory:
-    #for station in network:
-        #for channel in station:
-            #station_coordinates.append((network.code, station.code, 
-                                        #station.latitude, station.longitude, 
-                                        #station.elevation,channel.azimuth))
+print("getting station coordinates")
+station_coordinates = []
+for network in inventory:
+    for station in network:
+        for channel in station:
+            station_coordinates.append(network.code)
+            station_coordinates.append(station.code)
+            station_coordinates.append(station.latitude)
+            station_coordinates.append(station.longitude)
+            station_coordinates.append(station.elevation)
+            station_coordinates.append(channel.azimuth)
 
 
 #print(station_coordinates)
 
-stalat= 47.8651
-stalon = 107.0532
-staelev = 1610.0
-
+for ele in enumerate(station_coordinates):
+    stalat= station_coordinates[2]
+    stalon = station_coordinates[3]
+    staelev = station_coordinates[4]
 spliteve = []
 goodfast = []
 badfast = []
