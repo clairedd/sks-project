@@ -10,7 +10,7 @@ from obspy.core.event import Amplitude
 from multiprocessing import Pool
 
 #mpl.rc('font',family='serif')
-#mpl.rc('font',serif='Times') 
+#mpl.rc('font',serif='Times')
 #mpl.rc('text', usetex=True)
 #mpl.rc('font',size=12)
 
@@ -18,7 +18,7 @@ from obspy.taup import TauPyModel
 model = TauPyModel(model="iasp91")
 
 print("Defining our Functions")
-def getsksstuff(st, debug = False):
+def getsksstuff(st, debug = True):
     # debug is a flag to help with debugging.  So if we switch it to false
     # then all the print statements turn off
     if debug:
@@ -28,43 +28,63 @@ def getsksstuff(st, debug = False):
         print(phis)
     # Start with a huge lambda and then try to update it
     minlam = 50000.
-    # Make a copy of st and window it at 20 s from the start
+    if debug:
+        print('Lambda Assigned')
+    # Make a copy of st and window it at 6 s from the start
     stF = st.copy()
-    stF = stF.trim(endtime = stF[0].stats.starttime + 20.)
+    if debug:
+        print('stF has been initialized')
+    stF = stF.trim(endtime = stF[0].stats.starttime + 5.)
     dt = 0.
+    #phigood = 0.
+    #dtgood = 0.
     # Slide through the slow axis with steps of .1
-    #print("Starting Calculation")
-    for stW in st.slide(window_length=20., step=.1):
+    if debug:
+        print("Starting Calculation")
+    for stW in st.slide(window_length=6., step=.1):
         dt += .1
+        if debug:
+            print('Rotating around all Phis')
         for phi in phis:
             # Rotate the data by the given phi
             comp1 = np.cos(phi)*stF[0].data - np.sin(phi)*stF[1].data
             comp2 = np.sin(phi)*stW[0].data + np.cos(phi)*stW[1].data
             # comp1 is our "fast" component and comp2 is slow
+            if debug:
+                print('Fast vector is done')
+                print('Slow vector is done')
             comp1 += -np.mean(comp1)
             comp2 += -np.mean(comp2)
+            if debug:
+                print('Data is now demeaned')
             # Make our coveraiance matrix
             c11 = sum(comp1*comp1)
             c22 = sum(comp2*comp2)
             c12 = sum(comp1*comp2)
             cors = np.matrix([[c11,c12],[c12,c22]])
+            if debug:
+                print('Covariance Matrix computed. Now getting eigenvalues')
             # Compute some eigen values
             lamb, v = np.linalg.eig(cors)
             lamb = lamb.real.astype('float')
+            if debug:
+                print('Eigenvalue found. Determining splitting parameters')
             if lamb[0]*lamb[1] < minlam:
                 dtgood = dt
                 phigood = phi
                 #print("Found Good Fit")
                 if debug:
                     print('New minimum: ' + str(lamb[0]*lamb[1]))
-                    print('New phi: ' + str(phigood) + ' New dt: ' + str(dtgood))
+                    #print('New phi: ' + str(phigood) + ' New dt: ' + str(dtgood))
                 minlam = lamb[0]*lamb[1]
-    if debug:
-        print('Returning: ' + str(phigood) + ' ' + str(dtgood))
+                    #if debug:
+        #print('Returning: ' + str(phigood) + ' ' + str(dtgood))
     phigood = np.rad2deg(phigood)
     print('Here is our direction: ' + str(phigood) + ' here is our delay: ' + str(dtgood))
+    if debug:
+        print('Now saving our data')
     stW = st.copy()
-    stW.trim(stW[0].stats.starttime + dtgood, stW[0].stats.starttime + 20. + dtgood)
+    stW.trim(stW[0].stats.starttime + dtgood, stW[0].stats.starttime + 1. + dtgood)
     comp1 = np.cos(phigood)*stF[0].data - np.sin(phigood)*stF[1].data
     comp1 *= 1./np.max(np.abs(comp1))
     comp2 = np.sin(phigood)*stW[0].data + np.cos(phigood)*stW[1].data
@@ -84,15 +104,15 @@ def plots(stW, stF):
     plt.subplot(313)
     plt.plot(t, stW[0].data, color = 'c')
     plt.plot(t, phigood*stW[1].data, color = 'burlywood')
-    goods = plt.savefig(eve.origins[0].time + '.jpg', format= 'JPEG', dpi=200)
+    #goods = plt.savefig(eve.origins[0].time + '.jpg', format= 'JPEG', dpi=200)
     return goods
 
 
 print("Getting Station Info")
 net = 'IU'
-stat= 'ANMO'
+stat= 'ULN'
 
-stime = UTCDateTime('2010-001T00:00:00.0')
+stime = UTCDateTime('2016-001T00:00:00.0')
 
 #stalat = 40.128
 #stalon= -107.51
@@ -121,6 +141,10 @@ for ele in enumerate(station_coordinates):
     stalat= station_coordinates[2]
     stalon = station_coordinates[3]
     staelev = station_coordinates[4]
+
+print(stalat)
+print(stalon)
+
 spliteve = []
 goodfast = []
 badfast = []
@@ -134,96 +158,102 @@ goodsplitd = []
 
 print("Getting Events")
 # Map of events
-cat = client.get_events(starttime=stime, minmagnitude=6., latitude=stalat, 
+cat = client.get_events(starttime=stime, minmagnitude=6., latitude=stalat,
                         longitude=stalon, maxradius=130., minradius = 88.)
                                            
 #def splittingparam(cat):
 for eve in cat:
     #print(eve)
-    try:
-        (dis,azi, bazi) = gps2dist_azimuth(stalat, stalon, eve.origins[0].latitude,eve.origins[0].longitude)
-        arrivals = model.get_travel_times(source_depth_in_km=eve.origins[0].depth/1000., distance_in_degree=dis)
-        #st = Stream()
-        for arrival in arrivals:
-            #print(arrival)
-            if arrival.name == 'SKS':
-                #print(eve)
-                #print('Windowing SKS event time')
-                skstime = (eve.origins[0].time + arrival.time)-20.
-                etime = (eve.origins[0].time + arrival.time)+ 30.
-                nstime = eve.origins[0].time - 300.
-                netime = eve.origins[0].time - 250.
-                print("Getting Waveform data")
-                st = client.get_waveforms(net, stat, '00', 'BH*', skstime, etime, attach_response = True)
-                stN = client.get_waveforms(net, stat, '00', 'BH*', nstime, netime, attach_response = True)
-                #print("Processing our data")
-                st.remove_sensitivity()
-                stN.remove_sensitivity()
-                st.filter('bandpass', freqmin= 0.06, freqmax = 0.09)
-                stN.filter('bandpass', freqmin= 0.06, freqmax = 0.09)
-                st.taper(0.05)
-                stN.taper(0.05)
-                #This is a hack for rotation
-                #print("Rotating Data")
-                for tr in st.select(channel = 'BH1'):
-                    tr.stats.channel = 'BHN'
-                for tr in st.select(channel = 'BH2'):
-                    tr.stats.channel = 'BHE'
-                st.rotate('NE->RT', bazi)
-                for tr in stN.select(channel = 'BH1'):
-                    tr.stats.channel = 'BHN'
-                for tr in stN.select(channel = 'BH2'):
-                    tr.stats.channel = 'BHE'
-                stN.rotate('NE->RT', bazi)
-                stS = st.copy()
-                stN.std()
-                S = stS[0].std()
-                N = stN[0].std()
-                #print("Calculating Signal-to-Noise Ratio")
-                snr = S/N
+    (dis,azi, bazi) = gps2dist_azimuth(stalat, stalon, eve.origins[0].latitude,eve.origins[0].longitude)
+    arrivals = model.get_travel_times(source_depth_in_km=eve.origins[0].depth/1000., distance_in_degree=dis)
+    #st = Stream()
+    for arrival in arrivals:
+        #print(arrival)
+        if arrival.name == 'SKS':
+            #print(eve)
+            #print('Windowing SKS event time')
+            skstime = (eve.origins[0].time + arrival.time)- 1.
+            etime = (eve.origins[0].time + arrival.time)+ 5.
+            nstime = eve.origins[0].time - 300.
+            netime = eve.origins[0].time - 294.
+            print("Getting Waveform data")
+            st = client.get_waveforms(net, stat, '00', 'BH*', skstime, etime, attach_response = True)
+            stN = client.get_waveforms(net, stat, '00', 'BH*', nstime, netime, attach_response = True)
+            #print("Processing our data")
+            st.remove_sensitivity()
+            stN.remove_sensitivity()
+            st.filter('bandpass', freqmin= 0.06, freqmax = 0.09)
+            stN.filter('bandpass', freqmin= 0.06, freqmax = 0.09)
+            st.taper(0.05)
+            stN.taper(0.05)
+                #st.plot()
+                #stN.plot()
+            #This is a hack for rotation
+            #print("Rotating Data")
+            for tr in st.select(channel = 'BH1'):
+                tr.stats.channel = 'BHN'
+            for tr in st.select(channel = 'BH2'):
+                tr.stats.channel = 'BHE'
+            st.rotate('NE->RT', bazi)
+            for tr in stN.select(channel = 'BH1'):
+                tr.stats.channel = 'BHN'
+            for tr in stN.select(channel = 'BH2'):
+                tr.stats.channel = 'BHE'
+            stN.rotate('NE->RT', bazi)
+            stS = st.copy()
+            stN.std()
+            S = stS[0].std()
+            N = stN[0].std()
+            #print("Calculating Signal-to-Noise Ratio")
+            snr = S/N
+            print(snr)
                 
-                if snr>5:
-                    fast, delay, stF, stW, comp1, comp2 = getsksstuff(st)
-                    spliteve.append(eve)
-                    goodfast.append(fast)
-                    gooddelay.append(delay)
-                    gc1.append(comp1)
-                    gc2.append(comp2)
-                    print("Good Split")
-                else:
-                    fast, delay, stF, stW, comp1, comp2 = getsksstuff(st)
-                    badfast.append(fast)
-                    baddelay.append(delay)
-                    print("Bad Split")
+            if snr>5:
+                fast, delay, stF, stW, comp1, comp2 = getsksstuff(st)
+                spliteve.append(eve)
+                goodfast.append(fast)
+                gooddelay.append(delay)
+                gc1.append(comp1)
+                gc2.append(comp2)
+                print("Good Split")
+            else:
+                fast, delay, stF, stW, comp1, comp2 = getsksstuff(st)
+                badfast.append(fast)
+                baddelay.append(delay)
+                print("Bad Split")
                 
-    except:
-        pass
+
         
 plt.scatter(gooddelay, goodfast, color = 'c')
-plt.scatter(baddelay, badfast, color = 'r')        
-plt.savefig('SNR_more_than_5.jpg', format = 'JPEG')
+plt.scatter(baddelay, badfast, color = 'r')
+plt.xlabel("Delay Time (Seconds)")
+plt.ylabel("Fast Direction (Degrees)")
+plt.xticks()
+plt.yticks()
+plt.show()
+#plt.savefig('SNR_more_than_5.jpg', format = 'JPEG')
 
-for eveidx, eve in enumerate(spliteve):
-    if eveidx == 0:
-        goodcompf = gc1[eveidx]
-        goodcompw = gc2[eveidx]
-        goodsplitf.append(goodfast[eveidx])
-        goodsplitd.append(gooddelay[eveidx])
-        print("Reference Added")
-    else:
-        compf = gc1[eveidx]
-        compw = gc2[eveidx]
-        fcompr = np.abs(compf-goodcompf/goodcompf)
-        wcompr = np.abs(compw-goodcompw/goodcompw)
-        if fcompr[eveidx] < 0.1: 
-            if wcompr[eveidx]<0.1:
-                goodsplitf.append(goodfast[eveidx])
-                goodsplitd.append(gooddelay[eveidx])
-            print("Good Comparison, another event added")
-        else:
-            print("Bad Comparison, data thrown out")
-
-plt.savefig('Data_Within_10p.jpg', format = 'JPEG')
+#for eveidx, eve in enumerate(spliteve):
+#    if eveidx == 0:
+#        goodcompf = gc1[eveidx]
+#        goodcompw = gc2[eveidx]
+#        goodsplitf.append(goodfast[eveidx])
+#        goodsplitd.append(gooddelay[eveidx])
+#        print("Reference Added")
+#    else:
+#        compf = gc1[eveidx]
+#        compw = gc2[eveidx]
+#        fcompr = np.abs(compf-goodcompf/goodcompf)
+#        wcompr = np.abs(compw-goodcompw/goodcompw)
+#        if fcompr[eveidx] < 0.1:
+#            if wcompr[eveidx]<0.1:
+#                goodsplitf.append(goodfast[eveidx])
+#                goodsplitd.append(gooddelay[eveidx])
+#            print("Good Comparison, another event added")
+#        else:
+#            print("Bad Comparison, data thrown out")
+#
+#plt.savefig('Data_Within_10p.jpg', format = 'JPEG')
 #print("Getting Events")
 # Map of events
 #cat = []
