@@ -20,7 +20,7 @@ model = TauPyModel(model="iasp91")
 client = Client("IRIS")
 net = 'IU'
 stat= 'ULN'
-stime = UTCDateTime('2016-001T00:00:00.0')
+stime = UTCDateTime('2018-001T00:00:00.0')
 
 #Event Parameters: Mw and distance of events you want to pull from
 #Minimum Event Magnitude
@@ -51,8 +51,8 @@ set forth should run based off of the parameters given above.
 phis = np.deg2rad(np.arange(-90.,90.,1.))
 dts = np.arange(0.0, 5.0, 0.1)
 #Initialize vectors that will be used to store data later on.
-stF = []
-stW = []
+#stF = []
+#stW = []
 spliteve = []
 goodfast = []
 badfast = []
@@ -93,6 +93,7 @@ def Ematrix(phis, dts):
         dataset = [stF,stW]
         dataset = np.array([dataset])
         testfast = Ms * dataset.T
+        print(np.shape(testfast))
         #Compute the temporary value of the fast direction for that cell.
         #Need to run through splitlab code to figure out what pickwin is
         tmpF = testfast[0, pickwin]
@@ -207,27 +208,33 @@ def getphaseevents(client, net, sta, stime):
                 N = stN[0].std()
                 #print("Calculating Signal-to-Noise Ratio")
                 snr = S/N
-                if snr >5:
-                    stF = st.copy()
-                    stW = st.copy()
-                    delay, backazi = convert(phis, dts, stF, stW)
-                    spliteve.append(eve)
-                    goodfast.append(backazi)
-                    gooddelay.append(delay)
-                    print("Good Split")
-                    print('Delay Time is:  '+ delay + '   '+'Phi is:  '+ backazi)
-                else:
-                    stF = st.copy()
-                    stW = st.copy()
-                    delay, backazi = convert(phis, dts, stF, stW)
-                    spliteve.append(eve)
-                    goodfast.append(backazi)
-                    gooddelay.append(delay)
-                    print("Bad Split")
-    return eve, st, snr, spliteve, goodfast, gooddelay
+                spliteve.append(eve)
+    return spliteve, st, snr
+
+#Categorize events preliminarily into "Good" and "Bad" based off of the signal-to-noise ratio.
+splieve, st, snr = getphaseevents(client, net, stat, stime)
+for eve in spliteve:
+    if snr >5:
+        stF = st.copy()
+        stW = st.copy()
+        delay, backazi = convert(phis, dts, stF, stW)
+        spliteve.append(eve)
+        goodfast.append(backazi)
+        gooddelay.append(delay)
+        print("Good Split")
+        print('Delay Time is:  '+ delay + '   '+'Phi is:  '+ backazi)
+    else:
+        stF = st.copy()
+        stW = st.copy()
+        delay, backazi = convert(phis, dts, stF, stW)
+        spliteve.append(eve)
+        goodfast.append(backazi)
+        gooddelay.append(delay)
+        print("Bad Split")
+    #return eve, st, snr, spliteve, goodfast, gooddelay
 
 
 #Using the functions defined above, we now compute "good" and "bad" measurements on the basis of
 #signal-to-noise ratios. At some point, I would like particle motion to also be taken into account
 #but that is a future project.
-eve, st, snr, spliteve, goodfast, gooddelay = getphaseevents(client, net, stat, stime)
+#eve, st, snr, spliteve, goodfast, gooddelay = getphaseevents(client, net, stat, stime)
